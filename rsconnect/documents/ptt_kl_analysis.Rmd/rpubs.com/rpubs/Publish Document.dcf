@@ -1,0 +1,8 @@
+name: Publish Document
+title:
+account: rpubs
+server: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/223150/3163948c3c074124826ea6659d2bb268
+bundleId: https://api.rpubs.com/api/v1/document/223150/3163948c3c074124826ea6659d2bb268
+url: http://rpubs.com/leoluyi/223150
+when: 1477933142.81734

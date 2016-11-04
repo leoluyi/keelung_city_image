@@ -1,0 +1,21 @@
+name	talking_about_count	likes	link
+1	基隆人說讚	5885	11307	https://www.facebook.com/keelunglike
+2	基隆人踹共	5796	31840	https://www.facebook.com/aboutkeelung
+3	雨港基隆	4278	72727	https://www.facebook.com/RainyKeelung
+4	基隆廟囗夜市	3423	19243	https://www.facebook.com/pages/%E5%9F%BA%E9%9A%86%E5%BB%9F%E5%9B%97%E5%A4%9C%E5%B8%82/152168711507282
+5	基隆美食	2202	19015	https://www.facebook.com/keelung.bfd
+6	港灣城姬！基隆少女	2038	12485	https://www.facebook.com/pages/%E6%B8%AF%E7%81%A3%E5%9F%8E%E5%A7%AC%E5%9F%BA%E9%9A%86%E5%B0%91%E5%A5%B3/829446000437704
+7	基隆好美	1615	6545	https://www.facebook.com/pages/%E5%9F%BA%E9%9A%86%E5%A5%BD%E7%BE%8E/746454622050410
+8	基隆旅遊網	1195	14705	https://www.facebook.com/klcgfans
+9	基隆警馨雲	1101	6314	https://www.facebook.com/klgpolice
+10	早安基隆	762	7636	https://www.facebook.com/ilovekeelung
+11	Vita睛豔時尚美睫／接睫毛／植睫毛／種睫毛／手足保養／熱蠟除毛／稼接睫毛教學／材料批發／基隆首選	685	10927	https://www.facebook.com/vita24211518
+12	我是基隆人	650	36916	https://www.facebook.com/Keelung.Info
+13	Ghetto X  Oldschool 基隆波神	513	9142	https://www.facebook.com/ghettohoney
+14	基隆林媽媽狗場	428	11660	https://www.facebook.com/lmdog500
+15	基隆市稅務局	282	9209	https://www.facebook.com/kltbtax
+16	基隆旅遊	118	7670	https://www.facebook.com/travel.keelung
+17	【基隆up】 - 林沛祥 《小林老師》	115	7926	https://www.facebook.com/keelungup
+18	我是基隆人	53	24068	https://www.facebook.com/i.Keelung
+19	基隆航海節	5	9884	https://www.facebook.com/2012keelung
+20	基隆市私立幼幼幼兒園	4	6938	https://www.facebook.com/yoyokindergarten
