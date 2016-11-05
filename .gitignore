@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .dropbox
+*_cache/
+*_files/
