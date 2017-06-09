@@ -2,12 +2,12 @@
 title: "PTT Keelung Analysis"
 author: "LU YI"
 date: "`r Sys.Date()`"
-output: 
-  html_notebook: 
-    code_folding: hide
-    highlight: pygments
-    theme: flatly
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r, include=FALSE}
+```{r, cache=FALSE, include=FALSE}
 library(magrittr)
 library(data.table)
 library(dplyr)
@@ -38,7 +38,6 @@ library(wordcloud2)
 library(ldatuning) # Select number of topics for LDA model # sudo apt install libmpfr-dev
 library(wordVectors) # devtools::install_github("bmschmidt/wordVectors")
 library(ggplot2)
-library(plotly)
 library(feather)
 library(DT)
 library(corrr) # for corr plot
@@ -65,6 +64,8 @@ ptt_dt[, `:=`(post_time = ifelse(post_time>=as.POSIXct("1990-01-01","CST") %>%
                                  NA))]
 ptt_dt[, `:=`(post_time = post_time %>% 
                  as.POSIXct(tz = "CST", origin = "1970-01-01"))]
+ptt_dt[, category := 
+         stringr::str_extract(title, "^\\[([^]]+?)\\]")]
 ```
 
 - 來源：PTT Keeling 板
@@ -76,8 +77,6 @@ ptt_dt[, `:=`(post_time = post_time %>%
 ### 文章種類 Top 20
 
 ```{r}
-ptt_dt[, category := 
-         stringr::str_extract(title, "^\\[([^]]+?)\\]")]
 ptt_dt[!is.na(category), .N, by = .(category)][order(-N)] %>% head(20)
 ```
 
@@ -250,6 +249,9 @@ l1_terms <- (dtm_train_tfidf %>% find_freq_terms(lowfreq = 5) %>%
 # term.table <- dtm %>% slam::col_sums()
 # term.table <- sort(term.table, decreasing = TRUE)
 term.table <- setNames(vocab$vocab$terms_counts, vocab$vocab$terms)
+del <- term.table < 5
+term.table <- term.table[!del]
+vocab_ <- names(term.table)
 
 # remove terms that are stop words or occur fewer than 5 times:
 # del <- term.table < 5
@@ -261,11 +263,11 @@ get_terms <- function(doc.list, vocab) {
   index <- index[!is.na(index)]
   rbind(as.integer(index - 1), as.integer(rep(1, length(index))))
 }
-documents <- mclapply(doc.list, get_terms, vocab=l1_terms, mc.cores = 3)
+documents <- mclapply(doc.list, get_terms, vocab=vocab_, mc.cores = 3)
 
 # Compute some statistics related to the data set:
 D <- length(documents)  # number of documents (2,000)
-W <- length(vocab)  # number of terms in the vocab (14,568)
+W <- length(vocab_)  # number of terms in the vocab (14,568)
 doc.length <- sapply(documents, function(x) sum(x[2, ]))  # number of tokens per document [312, 288, 170, 436, 291, ...]
 N <- sum(doc.length)  # total number of tokens in the data (546,827)
 term.frequency <- as.integer(term.table)  # frequencies of terms in the corpus
@@ -322,7 +324,7 @@ eta <- 0.02
 set.seed(2016)
 t1 <- Sys.time()
 lda_fit <- lda.collapsed.gibbs.sampler(
-  documents = documents, K = K, vocab = vocab, 
+  documents = documents, K = K, vocab = vocab_, 
   num.iterations = G, alpha = alpha, 
   eta = eta, initial = NULL, burnin = 0,
   compute.log.likelihood = TRUE)
@@ -330,14 +332,14 @@ t2 <- Sys.time()
 t2 - t1  # about 2.899927 mins on server
 
 # Save Result
-save(lda_fit, file = "./models/ptt_keelung_lda_fit.RData")
+# save(lda_fit, file = "./models/ptt_keelung_lda_fit.RData")
 ```
 
 根據指標選擇 55 個 topic cluster
 
 **Result**
 
-```{r, cache=FALSE}
+```{r topic models result, cache=FALSE}
 library(lda)
 load("./models/ptt_keelung_lda_fit.RData")
 # Top topic result
@@ -368,7 +370,7 @@ vector_set <- train_word2vec(train_file = "data/tokenized/ptt_keelung_split.txt"
                           window = 12)
 print(Sys.time() - tic)
 ```
-```{r, echo=FALSE}
+```{r, include=FALSE}
 library(wordVectors)
 vector_set <- read.vectors("models/ptt_keelung_word2vec.bin")
 ```
@@ -392,6 +394,13 @@ nearest_to(vector_set, vector_set[["停車"]], n = 20)
 ```{r}
 nearest_to(vector_set, vector_set[["交通"]], n = 20)
 ```
+
+- 交通
+
+```{r}
+nearest_to(vector_set, vector_set[[c("交通", "動線", "停車")]], n = 20)
+```
+
 
 ### 向量 (根據文字向量距離由小至大排列)
 

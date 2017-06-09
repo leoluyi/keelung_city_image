@@ -1,0 +1,228 @@
+---
+title: "Appledaily Keelung Analysis"
+author: "LU YI"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	collapse = TRUE,
+	fig.align = "center",
+	fig.width = 8,
+	comment = "#>"
+)
+```
+
+```{r, cache=FALSE, include=FALSE}
+library(magrittr)
+library(data.table)
+library(dplyr)
+library(dtplyr)
+library(readr)
+library(stringr)
+library(tm) # install.packages("slam", type = "binary")
+library(text2vec)
+library(jiebaR) # word segmentation
+library(wordcloud2)
+# library(topicmodels)
+# http://stackoverflow.com/questions/24172188/how-can-i-install-topicmodels-package-in-r
+library(ldatuning) # Select number of topics for LDA model # sudo apt install libmpfr-dev
+library(wordVectors) # devtools::install_github("bmschmidt/wordVectors")
+library(ggplot2)
+library(feather)
+library(DT)
+library(corrr) # for corr plot
+library(Matrix) # for Sparse Matrix
+library(slam)
+library(lubridate)
+library(viridis)
+lapply(list.files("utils", pattern = "\\.[Rr]$", full.names = TRUE), 
+       FUN = function(x) {source(x, encoding = "UTF-8"); return()})
+# devtools::install_github("qinwf/ropencc") # 繁簡轉換
+```
+
+## Data Source
+
+```{r, include=FALSE, cache=TRUE}
+news_dt <- fread("data/appledaily_keelung.csv", colClasses = "character")
+
+# # Data Cleansing
+news_dt[, `:=`(datetime = datetime %>%
+         strptime("%FT%T", tz = "GMT") %>% as.POSIXct)]
+```
+
+- 來源：蘋果日報網站
+- 期間：`r min(news_dt$datetime, na.rm=T)` - `r max(news_dt$datetime, na.rm=T)`
+- 文本數量：`r nrow(news_dt)` 篇文章
+
+```{r tm functions, cache=FALSE, include=FALSE}
+## 起手式，結巴建立斷詞器
+mix_seg <- worker(type = "mix",
+                  user = "utils/dict_utf8.txt",
+                  stop_word = "utils/stop_utf8.txt",
+                  symbol = FALSE,
+                  encoding = "UTF-8")
+hmm_seg <- worker(type = "hmm",
+                  user = "utils/dict_utf8.txt",
+                  stop_word = "utils/stop_utf8.txt",
+                  symbol = FALSE,
+                  encoding = "UTF-8")
+# mix_seg <= post_text[1] # try first post
+
+# self-made filter (built-in perl's regular expression has bug)
+cutter <- function (text, worker = mix_seg) {
+  # text = "馬英九去世新大學演講"
+  if (text %in% c(".", "")) {
+    return(NA_character_)
+  }
+  
+  filter_words = c(
+    "食(品)?安(全)?","食品",
+    "英文$","年\\n","媒\\n",
+    "我.?","他.?","你.?",
+    "所以","可以","沒有","不過","因為",
+    "還是","覺得","大家","比較","感覺","時候","現在","時間",
+    "可能","東西","然後","而且","自己","有點",
+    "這邊","那.","發現","雖然","不要","還是",
+    "一樣","知道","看到","真的","今天","就是","這樣","如果",
+    "不會","什麼","後來","問題","之前","只是","或是","的話",
+    "其他","這麼","已經","很多","出來","整個","但是","卻",
+    "偏偏","如果","不過","因此","或","又","也","其實",
+    "希望","結果","怎麼","當然","有些","以上","另外","此外",
+    "以外","裡面","部分","直接","剛好","由於",
+    "原本","標題","時間","日期","作者","這種","表示","看見",
+    "似乎","一半","一堆","反正","常常","幾個","目前","上次",
+    "公告","只好","哪裡","一.","怎麼","好像","結果",
+    "而已", "居然", "謝謝",
+    "po","xd","應該","最後","有沒有","sent","from","my",
+    "Android", "JPTT",
+    "記者",
+    "中心","之.","指出","朋友",
+    "了","也","的","在","與","及","等","是","the","and",
+    "月", "年", "日", "時", "NA",
+    "com",
+    "\\s",
+    "[a-zA-Z]",
+    "[0-9]"
+  )
+  pattern <- sprintf("^%s", paste(filter_words, collapse = "|^"))
+  tryCatch({
+    text_seg <- worker <= text
+  }, error = function(e) {
+    stop('"', text, '" >> ', e)
+  })
+  filter_seg <- text_seg[!stringr::str_detect(text_seg, pattern)]
+  filter_seg
+}
+```
+
+
+## word2vec
+
+```{r, eval=FALSE, include=FALSE}
+library(wordVectors)
+
+# Prepare tokenizes text file
+all_text <- news_dt[, news_text]
+all_text_split <- all_text %>%
+  lapply(cutter, worker = mix_seg) %>% 
+  lapply(function(x) x[!is.na(x)]) %>% 
+  sapply(paste, collapse = " ")
+all_text_split %>% write_lines("data/tokenized/appledaily_kl_split.txt")
+
+# Fit models
+tic <- Sys.time()
+vector_set <- train_word2vec(train_file = "data/tokenized/appledaily_kl_split.txt",
+                          output_file = "models/apple_keelung_word2vec.bin",
+                          force = TRUE,
+                          vectors = 100,
+                          threads = parallel::detectCores()-1,
+                          window = 12)
+print(Sys.time() - tic)
+```
+```{r, include=FALSE}
+library(wordVectors)
+vector_set <- read.vectors("models/apple_keelung_word2vec.bin")
+```
+
+
+### 相近關聯詞
+
+- 景點
+
+```{r}
+nearest_to(vector_set, vector_set[["景點"]], n = 20)
+```
+
+- 停車
+
+```{r}
+nearest_to(vector_set, vector_set[["停車"]], n = 20)
+```
+
+- 交通
+
+```{r}
+nearest_to(vector_set, vector_set[["交通"]], n = 20)
+```
+
+### 向量 (根據文字向量距離由小至大排列)
+
+- 遊客：夜市= 本地人：？
+
+```{r}
+nearest_to(vector_set,
+vector_set[["遊客"]] - vector_set[["夜市"]] + vector_set[["本地人"]],
+n = 10)
+```
+
+
+- 基隆：市長 = 台北 : ?
+
+```{r}
+nearest_to(vector_set,
+vector_set[["基隆"]] - vector_set[["市長"]] + vector_set[["台北"]],
+n = 10)
+```
+
+- 基隆：海洋廣場 = 台北 : ?
+
+```{r}
+nearest_to(vector_set,
+vector_set[["基隆"]] - vector_set[["海洋廣場"]] + vector_set[["台北"]],
+n = 10)
+```
+
+－ 基隆：交通=台北:?
+
+```{r}
+nearest_to(vector_set,
+vector_set[["基隆"]] - vector_set[["交通"]] + vector_set[["台北"]],
+n = 10)
+```
+
+- 基隆：交通=新北市:?
+
+```{r}
+nearest_to(vector_set,
+vector_set[["基隆"]] - vector_set[["交通"]] + vector_set[["新北市"]],
+n = 10)
+```
+
+- 基隆：河 = 台北:？
+
+```{r}
+nearest_to(vector_set,
+vector_set[["基隆"]] - vector_set[["河"]] + vector_set[["台北"]],
+n = 10)
+```
+
